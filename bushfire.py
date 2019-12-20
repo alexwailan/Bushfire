@@ -67,11 +67,63 @@ def getargv():
 
 	parser.add_argument('aln_file', help='Core SNV alignment file', metavar='FILE',type=str, nargs='?')
 	parser.add_argument('masking_file', help='The masking files with regions defined in an EMBL style tab-delimited file.', metavar='FILE', type=str, nargs='?')
+    parser.add_argument('tree', action="store", help='Name of output JAR tree.', metavar='FILE', type=str, nargs='?',default='tree')
 	parser.add_argument('-d',	'--dirpath', help='Specify input directory containing files. End with a forward slash. Eg. /temp/fasta/', metavar='DIR', type=str, nargs='?', default=os.getcwd()+'/') 
 	parser.add_argument('-o',	'--outdir', help='Specify output directory. End with a forward slash. Eg. /temp/fasta/; Default to use current directory.', metavar='DIR', type=str, nargs='?', default=os.getcwd()+'/')       
 	return parser.parse_args()
 
+##########################################
+    # Functions for the main program #
+##########################################
 
+def purge():
+
+    command = "purge.py %s %s"%(idir+afile,idir+mfile) #building the command to be run
+
+    p = subprocess.call(command, shell=True,    stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    gzip_f = Path(odir+i+'/'+i+'.vcf.gz')
+
+    ##########################################
+    # Check if masked aln file exists (Purge out file)
+    ##########################################
+
+    mcore_f = Path(idir+'masked_core.snp_sites.aln')
+    if not os.path.isfile(mcore_f):
+        ErrorOut('Purge failed.')
+
+    print("Purge successfull!")
+    
+def germie():
+
+    command = "germie.py %s %s"%(idir+purgefile,tree)
+
+    p = subprocess.Popen(command), shell=True,    stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    output,error = p.communicate() #Read data from stdout and stderr. Wait for process to terminate.
+    
+    ##########################################
+    # Check if JAR tree file exists (Germie out file)
+    ##########################################
+
+    jar_f = Path(idir+tree+'.joint.tre')
+
+    if not os.path.isfile(jar_f):
+        ErrorOut('germie failed.')    
+    
+def potplant():
+    
+    command = "potplant.py %s"%(idir+JARtreefile)
+
+    p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+
+    output,error = p.communicate() #Read data from stdout and stderr. Wait for process to terminate.
+    
+    ##########################################
+    # Check if Potplant file exists (potplant out file)
+    ##########################################
+    potp_f = Path(idir+tree+'.joint.tre')
+
+    if not os.path.isfile(potp_f):
+        ErrorOut('potplant failed.')
 
 
 ################
@@ -96,8 +148,8 @@ def main():
     odir = args.outdir ##the directory for output
     afile = args.aln_file #reading in alignment file
     mfile = args.masking_file #reading in masking file
-
-
+    tree = args.tree #reading in tree name 
+    
     print()
     print("Checking dependencies mate! \n")
 
@@ -147,99 +199,33 @@ def main():
 
     #############################################################################################
     #
-    #      Construct the output command for the program, use the slurm script as a template
-    #      to construct the shell script & run
+    #   Time for the three step program to build a JAR tree
     #
     #############################################################################################
 
     print("Time to start the Aussie tree cycle of life!")
     
     ######################################################
-    # copy lodestone vcf output into each sample directory
+    # Purge the aln file(tree seed) with fire!  (Run purge module)
     ######################################################
-
-    #WILL HAVE TO CHANGE THIS DIRECTORY
-
-    p = subprocess.call("cp -r %s %s"%(pdir+i+'.vcf.gz', odir+i+'/'), shell=True,    stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-    gzip_f = Path(odir+i+'/'+i+'.vcf.gz')
-
-    if not os.path.isfile(gzip_f):
-        print("Stopped Bushwalking with %s." %i)
-        print("Copying files failed. Unable to find required vcf.gz file for bcftools." %i)
-        break
+    
+    purge()
 
     ######################################################
-    # Create VCF file with only SNVs
+    # Time to grow the JAR tree (Run Germie)
     ######################################################        
-
-    p = subprocess.Popen("bcftools view --types snps %s > %s"%(odir+i+'/'+i+'.vcf.gz',odir+i+'/'+i+'.SNV.vcf'), shell=True,    stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-    output,error = p.communicate() #Read data from stdout and stderr. Wait for process to terminate.
-    vcf_f = Path(odir+i+'/'+i+'.SNV.vcf')
-
-    if not os.path.isfile(vcf_f):
-        print("Stopped Bushwalking with %s." %i)
-        print("bcftools view failed")
-        print(error)
-        break
-
+    
+    purgefile = 'masked_core.snp_sites.aln'
+    germie()
+    
     ######################################################
-    # Compress for indexing & Index vcf
-    ######################################################   
-
-    p = subprocess.Popen("bgzip %s"%(odir+i+'/'+i+'.SNV.vcf'), shell=True, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-
-    output,error = p.communicate() #Read data from stdout and stderr. Wait for process to terminate.
-    bg_f = Path(odir+i+'/'+i+'.SNV.vcf.gz')
-
-    if not os.path.isfile(bg_f):
-        print("Stopped Bushwalking with %s." %i)
-        print("bgzip failed")
-        break
-
-        #index the vcf file
-    p = subprocess.Popen("tabix -p vcf %s"%(odir+i+'/'+i+'.SNV.vcf.gz'), shell=True,    stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    # Time to put your tree in a potplant to take away (Run potplant)
+    ######################################################  
+    
+    JARtreefile = str(tree+'.joint.tre')
+    potplant()
 
 
-    index_f = Path(odir+i+'/'+i+'.SNV.vcf.gz.tbi')
-    output,error = p.communicate() #Read data from stdout and stderr. Wait for process to terminate.
-
-    if not os.path.isfile(index_f):
-        print("Stopped Bushwalking with %s." %i)
-        print("tabix failed")
-        print(error)
-        break
-
-    ######################################################
-    # Generate consensus alignment file with bcftools
-    ######################################################   
-
-    p = subprocess.Popen("bcftools consensus -f %s -o %s %s"%(reference,odir+i+'/'+i+'.SNV.aligned.fa',odir+i+'/'+i+'.SNV.vcf.gz'), shell=True,    stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-    #print(odir+i+'/'+i+'.SNV.vcf.gz')
-    output,error = p.communicate() #Read data from stdout and stderr. Wait for process to terminate.
-    aln_f = Path(odir+i+'/'+i+'.SNV.aligned.fa')
-
-    if not os.path.isfile(aln_f):
-        print("Stopped Bushwalking with %s." %i)
-        print("concensus failed")
-        print(error)
-        break
-
-    ######################################################
-    # Decompress vcf.gz to be used for snippy-core
-    ######################################################   
-
-    p = subprocess.Popen("bgzip -d %s "%(odir+i+'/'+i+'.SNV.vcf.gz'), shell=True,    stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-    output,error = p.communicate() #Read data from stdout and stderr. Wait for process to terminate.
-    vcf_f = Path(odir+i+'/'+i+'.SNV.vcf')
-
-    if not os.path.isfile(vcf_f):
-        print("Stopped Bushwalking with %s." %i)
-        print("bgzip decompression failed")
-        print(error)
-        break
-    p = subprocess.Popen("rm  %s "%(odir+i+'/'+i+'.vcf.gz'), shell=True,    stdout=subprocess.PIPE,stderr=subprocess.PIPE) #Clean up
-
-    if os.path.isfile(vcf_f) and os.path.isfile(aln_f):
-        print("Bushwalk was successfull for %s. "%i)
-    print()
+      
     print("Bushwalk complete. Did you find the trees?")
+
