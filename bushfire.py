@@ -11,7 +11,6 @@ import gzip
 import argparse
 import pandas as pd
 import numpy as np
-import csv
 import subprocess
 import pathlib
 from pathlib import Path
@@ -23,7 +22,7 @@ import shutil
 
 dependencies = [
     'remove_blocks_from_aln.py',
-    'snp-sites'
+    'snp-sites',
     'iqtree',
     'pyjar.py',
     'potplant.py',
@@ -64,13 +63,12 @@ def getargv():
     usage = 'bushfire.py [options] reference ids'
     description='Run Bushfire. A program to parse a multi-fasta core SNV alignment file to a ML tree'
     parser = argparse.ArgumentParser(usage=usage, description=description)
-
-	parser.add_argument('aln_file', help='Core SNV alignment file', metavar='FILE',type=str, nargs='?')
-	parser.add_argument('masking_file', help='The masking files with regions defined in an EMBL style tab-delimited file.', metavar='FILE', type=str, nargs='?')
-    parser.add_argument('tree', action="store", help='Name of output JAR tree.', metavar='FILE', type=str, nargs='?',default='tree')
-	parser.add_argument('-d',	'--dirpath', help='Specify input directory containing files. End with a forward slash. Eg. /temp/fasta/', metavar='DIR', type=str, nargs='?', default=os.getcwd()+'/') 
-	parser.add_argument('-o',	'--outdir', help='Specify output directory. End with a forward slash. Eg. /temp/fasta/; Default to use current directory.', metavar='DIR', type=str, nargs='?', default=os.getcwd()+'/')       
-	return parser.parse_args()
+    parser.add_argument('aln_file', help='Core SNV alignment file', metavar='FILE',type=str, nargs='?')
+    parser.add_argument('masking_file', help='The masking files with regions defined in an EMBL style tab-delimited file.', metavar='FILE', type=str, nargs='?')
+    parser.add_argument('tree', action="store", help='Name of output JAR tree.', metavar='PREFIX', type=str, nargs='?',default='tree')
+    parser.add_argument('-d',	'--dirpath', help='Specify input directory containing files. End with a forward slash. Eg. /temp/fasta/', metavar='DIR', type=str, nargs='?', default=os.getcwd()+'/') 
+    parser.add_argument('-o',	'--outdir', help='Specify output directory. End with a forward slash. Eg. /temp/fasta/; Default to use current directory.', metavar='DIR', type=str, nargs='?', default=os.getcwd()+'/')       
+    return parser.parse_args()
 
 ##########################################
     # Functions for the main program #
@@ -97,7 +95,7 @@ def germie():
 
     command = "germie.py %s %s"%(idir+purgefile,tree)
 
-    p = subprocess.Popen(command), shell=True,    stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    p = subprocess.Popen(command, shell=True,    stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     output,error = p.communicate() #Read data from stdout and stderr. Wait for process to terminate.
     
     ##########################################
@@ -227,5 +225,7 @@ def main():
 
 
       
-    print("Bushwalk complete. Did you find the trees?")
+    print("\nAfter the bushfire life will grow again. Did you get a good tree?")
 
+if __name__ == '__main__':
+    main()
